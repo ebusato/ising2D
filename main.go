@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"time"
@@ -20,8 +21,13 @@ import (
 	"go-hep.org/x/hep/hplot"
 )
 
+const (
+	kB = 1   // 1.38e-23 // kg.s^{-2}.K^{-1}
+	T  = 0.5 // Kelvin
+)
+
 type Spin struct {
-	Val int // -1 or +1
+	Val float64 // -1 or +1
 }
 
 type Grid struct {
@@ -36,7 +42,6 @@ func NewGrid(n int, j float64) *Grid {
 	for i, _ := range G.M {
 		G.M[i] = make([]Spin, n)
 	}
-	G.N = n
 	G.N = n
 	G.J = j
 	return G
@@ -64,40 +69,99 @@ func (g *Grid) Plot() {
 			s := g.M[i][j]
 			if s.Val == 1 {
 				h2d.Fill(float64(i), float64(j), 1)
+			} else {
+				h2d.Fill(float64(i), float64(j), 0)
 			}
 		}
 	}
 	plotH2D(h2d)
 }
 
-func (g *Grid) FlipRandomSpin() {
+func (g *Grid) PickRandomSpin() (int, int) {
 	i := rand.Intn(g.N)
 	j := rand.Intn(g.N)
+	return i, j
+}
+
+func (g *Grid) FlipSpin(i, j int) {
 	g.M[i][j].Val *= -1
 }
 
-/*
-func (g *Grid) Energy() {
-	for i := range g.M {
-		for j := range g.M[i] {
-
-		}
-	}
+// There are 4 nearest neighbours and for each of them, we store the two grid coordinates i (row number) and j (column number)
+type NearestNeighbours struct {
+	top, right, bottom, left [2]int
 }
-*/
+
+func (n *NearestNeighbours) Array() [4][2]int {
+	return [4][2]int{n.top, n.right, n.bottom, n.left}
+}
+
+func (g *Grid) FindNearestNeighbours(i, j int) NearestNeighbours {
+	NNs := NearestNeighbours{}
+	NNs.top = [2]int{i - 1, j}
+	NNs.right = [2]int{i, j + 1}
+	NNs.bottom = [2]int{i + 1, j}
+	NNs.left = [2]int{i, j - 1}
+	if i == 0 {
+		NNs.top[0] = g.N - 1
+	}
+	if i == g.N-1 {
+		NNs.bottom[0] = 0
+	}
+	if j == 0 {
+		NNs.left[1] = g.N - 1
+	}
+	if j == g.N-1 {
+		NNs.right[1] = 0
+	}
+	return NNs
+}
+
+func (g *Grid) SpinEnergy(i, j int) float64 {
+	NNs := g.FindNearestNeighbours(i, j)
+	NNsArr := NNs.Array()
+	var energy float64
+	for _, nn := range NNsArr {
+		iNN := nn[0]
+		jNN := nn[1]
+		energy += -1 * g.J * g.M[i][j].Val * g.M[iNN][jNN].Val
+	}
+	return energy
+}
 
 func main() {
 	flag.Parse()
+	rand.Seed(time.Now().UTC().UnixNano())
 
 	go webServer()
 
 	grid := NewGrid(10, 1)
 	grid.Init()
-	for {
-		time.Sleep(100 * time.Millisecond)
+	grid.Plot()
+	for k := 0; k < 100000; k++ {
+		time.Sleep(10 * time.Millisecond)
+		i, j := grid.PickRandomSpin()
+		fmt.Println("\ni, j = ", i, j)
+		eBef := grid.SpinEnergy(i, j)
+		grid.FlipSpin(i, j)
 		grid.Plot()
-		grid.FlipRandomSpin()
+		eAft := grid.SpinEnergy(i, j)
+		fmt.Println("eBef, eAft = ", eBef, eAft)
+		deltaE := eAft - eBef
+		if deltaE > 0 {
+			prob := math.Exp(-deltaE / (kB * T))
+			fmt.Println("prob=", prob)
+			rnd := rand.Float64()
+			if prob < rnd { // undo spin flip
+				grid.FlipSpin(i, j)
+				eAftUndo := grid.SpinEnergy(i, j)
+				fmt.Println("eAftUndo = ", eAftUndo)
+			}
+		}
+		grid.Plot()
 	}
+
+	time.Sleep(3000 * time.Millisecond)
 }
 
 var (
