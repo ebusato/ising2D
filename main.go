@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"image/color"
 	"log"
 	"math"
 	"math/rand"
@@ -22,8 +23,8 @@ import (
 )
 
 const (
-	kB = 1   // 1.38e-23 // kg.s^{-2}.K^{-1}
-	T  = 0.5 // Kelvin
+	kB = 1
+	T  = 3
 )
 
 type Spin struct {
@@ -47,6 +48,14 @@ func NewGrid(n int, j float64) *Grid {
 	return G
 }
 
+func (g *Grid) Len() int {
+	return g.N*g.N
+}
+
+func (g *Grid) XY(i int) (x, y float64) {
+	return i/g.N, i%g.N
+}
+
 func (g *Grid) Init() {
 	for i := range g.M {
 		for j := range g.M[i] {
@@ -62,6 +71,7 @@ func (g *Grid) Init() {
 	}
 }
 
+/*
 func (g *Grid) Plot() {
 	h2d := hbook.NewH2D(g.N, 0, float64(g.N), g.N, 0, float64(g.N))
 	for i := range g.M {
@@ -75,7 +85,10 @@ func (g *Grid) Plot() {
 		}
 	}
 	plotH2D(h2d)
+
+
 }
+*/
 
 func (g *Grid) PickRandomSpin() (int, int) {
 	i := rand.Intn(g.N)
@@ -135,30 +148,36 @@ func main() {
 
 	go webServer()
 
-	grid := NewGrid(10, 1)
+	grid := NewGrid(80, 1)
 	grid.Init()
 	grid.Plot()
-	for k := 0; k < 100000; k++ {
-		time.Sleep(10 * time.Millisecond)
+	for k := 0; k < 10000000; k++ {
+		//time.Sleep(1 * time.Millisecond)
+		if k%100000 == 0 {
+			fmt.Println("k=", k)
+		}
 		i, j := grid.PickRandomSpin()
-		fmt.Println("\ni, j = ", i, j)
+		//fmt.Println("\ni, j = ", i, j)
 		eBef := grid.SpinEnergy(i, j)
 		grid.FlipSpin(i, j)
-		grid.Plot()
+		//grid.Plot()
 		eAft := grid.SpinEnergy(i, j)
-		fmt.Println("eBef, eAft = ", eBef, eAft)
+		//fmt.Println("eBef, eAft = ", eBef, eAft)
 		deltaE := eAft - eBef
+		//fmt.Println("deltaE=", deltaE)
 		if deltaE > 0 {
 			prob := math.Exp(-deltaE / (kB * T))
-			fmt.Println("prob=", prob)
 			rnd := rand.Float64()
-			if prob < rnd { // undo spin flip
+			//fmt.Println("prob, rnd=", prob, rnd)
+			if prob < rnd { // undo spin flip (don't accept change)
 				grid.FlipSpin(i, j)
-				eAftUndo := grid.SpinEnergy(i, j)
-				fmt.Println("eAftUndo = ", eAftUndo)
+				//eAftUndo := grid.SpinEnergy(i, j)
+				//fmt.Println("eAftUndo = ", eAftUndo)
 			}
 		}
-		grid.Plot()
+		if k%30000 == 0 {
+			grid.Plot()
+		}
 	}
 
 	time.Sleep(3000 * time.Millisecond)
@@ -180,6 +199,15 @@ func webServer() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func plotGrid(grid *Grid) {
+	sca1, err := hplot.NewScatter(grid)
+	if err != nil {
+		log.Fatal(err)
+	}
+	sca1.Color = color.RGBA{255, 0, 0, 255}
+	sca1.Radius = radius
 }
 
 func plotH2D(h2d *hbook.H2D) {
