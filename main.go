@@ -13,18 +13,16 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
 	"gonum.org/v1/plot/vg/vgsvg"
 
-	"go-hep.org/x/hep/hbook"
 	"go-hep.org/x/hep/hplot"
 )
 
 const (
 	kB = 1
-	T  = 3
+	T  = 0.1
 )
 
 type Spin struct {
@@ -46,14 +44,6 @@ func NewGrid(n int, j float64) *Grid {
 	G.N = n
 	G.J = j
 	return G
-}
-
-func (g *Grid) Len() int {
-	return g.N*g.N
-}
-
-func (g *Grid) XY(i int) (x, y float64) {
-	return i/g.N, i%g.N
 }
 
 func (g *Grid) Init() {
@@ -142,6 +132,55 @@ func (g *Grid) SpinEnergy(i, j int) float64 {
 	return energy
 }
 
+type Scatter struct {
+	N int
+	X []float64
+	Y []float64
+}
+
+func NewScatter(grid Grid, spinVal float64) *Scatter {
+	scatter := &Scatter{}
+	for i := range grid.M {
+		for j := range grid.M[i] {
+			s := grid.M[i][j]
+			if s.Val == spinVal {
+				scatter.N += 1
+				scatter.X = append(scatter.X, float64(i))
+				scatter.Y = append(scatter.Y, float64(j))
+			}
+		}
+	}
+	return scatter
+}
+
+func (s *Scatter) Len() int {
+	return s.N
+}
+
+func (s *Scatter) XY(i int) (x, y float64) {
+	return s.X[i], s.Y[i]
+}
+
+func Plot(grid Grid) {
+	scaUp := NewScatter(grid, +1)
+	scaDown := NewScatter(grid, -1)
+
+	hscaUp, _ := hplot.NewScatter(scaUp)
+	hscaDown, _ := hplot.NewScatter(scaDown)
+
+	hscaUp.Color = color.RGBA{255, 0, 0, 255}
+	hscaDown.Color = color.RGBA{0, 0, 255, 255}
+
+	p := hplot.New()
+	p.X.Label.Text = "x"
+	p.Y.Label.Text = "y"
+
+	p.Add(hscaUp, hscaDown)
+
+	s := renderSVG(p)
+	datac <- plots{s}
+}
+
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -150,7 +189,8 @@ func main() {
 
 	grid := NewGrid(80, 1)
 	grid.Init()
-	grid.Plot()
+	//grid.Plot()
+	Plot(*grid)
 	for k := 0; k < 10000000; k++ {
 		//time.Sleep(1 * time.Millisecond)
 		if k%100000 == 0 {
@@ -176,7 +216,8 @@ func main() {
 			}
 		}
 		if k%30000 == 0 {
-			grid.Plot()
+			//grid.Plot()
+			Plot(*grid)
 		}
 	}
 
@@ -201,15 +242,7 @@ func webServer() {
 	}
 }
 
-func plotGrid(grid *Grid) {
-	sca1, err := hplot.NewScatter(grid)
-	if err != nil {
-		log.Fatal(err)
-	}
-	sca1.Color = color.RGBA{255, 0, 0, 255}
-	sca1.Radius = radius
-}
-
+/*
 func plotH2D(h2d *hbook.H2D) {
 	p, err := plot.New()
 	if err != nil {
@@ -228,8 +261,9 @@ func plotH2D(h2d *hbook.H2D) {
 	s := renderSVG(p)
 	datac <- plots{s}
 }
+*/
 
-func renderSVG(p *plot.Plot) string {
+func renderSVG(p *hplot.Plot) string {
 	size := 20 * vg.Centimeter
 	canvas := vgsvg.New(size, size)
 	p.Draw(draw.New(canvas))
