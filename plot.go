@@ -65,8 +65,8 @@ const page = `
 		var plot = "";
 
 		function update() {
-			var p3 = document.getElementById("my-plot");
-			p3.innerHTML = plot;
+			var p1 = document.getElementById("my-plot");
+			p1.innerHTML = plot;
 		};
 
 		window.onload = function() {
