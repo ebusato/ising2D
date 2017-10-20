@@ -13,11 +13,11 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
 	"gonum.org/v1/plot/vg/vgsvg"
-
-	"go-hep.org/x/hep/hplot"
 )
 
 const (
@@ -132,50 +132,60 @@ func (g *Grid) SpinEnergy(i, j int) float64 {
 	return energy
 }
 
-type Scatter struct {
+type Points struct {
 	N int
 	X []float64
 	Y []float64
 }
 
-func NewScatter(grid Grid, spinVal float64) *Scatter {
-	scatter := &Scatter{}
+func NewPoints(grid Grid, spinVal float64) *Points {
+	points := &Points{}
 	for i := range grid.M {
 		for j := range grid.M[i] {
 			s := grid.M[i][j]
 			if s.Val == spinVal {
-				scatter.N += 1
-				scatter.X = append(scatter.X, float64(i))
-				scatter.Y = append(scatter.Y, float64(j))
+				points.N += 1
+				points.X = append(points.X, float64(i))
+				points.Y = append(points.Y, float64(j))
 			}
 		}
 	}
-	return scatter
+	return points
 }
 
-func (s *Scatter) Len() int {
-	return s.N
+func (p *Points) Len() int {
+	return p.N
 }
 
-func (s *Scatter) XY(i int) (x, y float64) {
-	return s.X[i], s.Y[i]
+func (p *Points) XY(i int) (x, y float64) {
+	return p.X[i], p.Y[i]
 }
 
 func Plot(grid Grid) {
-	scaUp := NewScatter(grid, +1)
-	scaDown := NewScatter(grid, -1)
+	pointsUp := NewPoints(grid, +1)
+	pointsDown := NewPoints(grid, -1)
 
-	hscaUp, _ := hplot.NewScatter(scaUp)
-	hscaDown, _ := hplot.NewScatter(scaDown)
+	//hscaUp, _ := hplot.NewScatter(scaUp)
+	//hscaDown, _ := hplot.NewScatter(scaDown)
+	//hscaUp.Color = color.RGBA{255, 0, 0, 255}
+	//hscaDown.Color = color.RGBA{0, 0, 255, 255}
+	//p := hplot.New()
+	//p.X.Label.Text = "x"
+	//p.Y.Label.Text = "y"
+	//p.Add(hscaUp, hscaDown)
 
-	hscaUp.Color = color.RGBA{255, 0, 0, 255}
-	hscaDown.Color = color.RGBA{0, 0, 255, 255}
+	scaUp, _ := plotter.NewScatter(pointsUp)
+	scaDown, _ := plotter.NewScatter(pointsDown)
 
-	p := hplot.New()
-	p.X.Label.Text = "x"
-	p.Y.Label.Text = "y"
+	scaUp.GlyphStyle.Color = color.RGBA{255, 0, 0, 255}
+	scaDown.GlyphStyle.Color = color.RGBA{0, 0, 255, 255}
+	scaUp.GlyphStyle.Radius = vg.Points(3.5)
+	scaDown.GlyphStyle.Radius = vg.Points(3.5)
+	scaUp.GlyphStyle.Shape = draw.BoxGlyph{}
+	scaDown.GlyphStyle.Shape = draw.BoxGlyph{}
 
-	p.Add(hscaUp, hscaDown)
+	p, _ := plot.New()
+	p.Add(scaUp, scaDown)
 
 	s := renderSVG(p)
 	datac <- plots{s}
@@ -263,7 +273,7 @@ func plotH2D(h2d *hbook.H2D) {
 }
 */
 
-func renderSVG(p *hplot.Plot) string {
+func renderSVG(p *plot.Plot) string {
 	size := 20 * vg.Centimeter
 	canvas := vgsvg.New(size, size)
 	p.Draw(draw.New(canvas))
