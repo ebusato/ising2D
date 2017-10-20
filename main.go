@@ -1,28 +1,26 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 	"math/rand"
-	"net/http"
 	"time"
-
-	"golang.org/x/net/websocket"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
-	"gonum.org/v1/plot/vg/vgsvg"
+)
+
+var (
+	addrFlag = flag.String("addr", ":5555", "server address:port")
 )
 
 const (
 	kB = 1
-	T  = 0.1
+	T  = 3
 )
 
 type Spin struct {
@@ -60,25 +58,6 @@ func (g *Grid) Init() {
 		}
 	}
 }
-
-/*
-func (g *Grid) Plot() {
-	h2d := hbook.NewH2D(g.N, 0, float64(g.N), g.N, 0, float64(g.N))
-	for i := range g.M {
-		for j := range g.M[i] {
-			s := g.M[i][j]
-			if s.Val == 1 {
-				h2d.Fill(float64(i), float64(j), 1)
-			} else {
-				h2d.Fill(float64(i), float64(j), 0)
-			}
-		}
-	}
-	plotH2D(h2d)
-
-
-}
-*/
 
 func (g *Grid) PickRandomSpin() (int, int) {
 	i := rand.Intn(g.N)
@@ -165,15 +144,6 @@ func Plot(grid Grid) {
 	pointsUp := NewPoints(grid, +1)
 	pointsDown := NewPoints(grid, -1)
 
-	//hscaUp, _ := hplot.NewScatter(scaUp)
-	//hscaDown, _ := hplot.NewScatter(scaDown)
-	//hscaUp.Color = color.RGBA{255, 0, 0, 255}
-	//hscaDown.Color = color.RGBA{0, 0, 255, 255}
-	//p := hplot.New()
-	//p.X.Label.Text = "x"
-	//p.Y.Label.Text = "y"
-	//p.Add(hscaUp, hscaDown)
-
 	scaUp, _ := plotter.NewScatter(pointsUp)
 	scaDown, _ := plotter.NewScatter(pointsDown)
 
@@ -188,161 +158,37 @@ func Plot(grid Grid) {
 	p.Add(scaUp, scaDown)
 
 	s := renderSVG(p)
-	datac <- plots{s}
+	datac <- Plots{Plot: s}
 }
 
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	go webServer()
+	go webServer(addrFlag)
 
 	grid := NewGrid(80, 1)
 	grid.Init()
-	//grid.Plot()
 	Plot(*grid)
 	for k := 0; k < 10000000; k++ {
 		//time.Sleep(1 * time.Millisecond)
-		if k%100000 == 0 {
+		if k%500000 == 0 {
 			fmt.Println("k=", k)
 		}
 		i, j := grid.PickRandomSpin()
-		//fmt.Println("\ni, j = ", i, j)
 		eBef := grid.SpinEnergy(i, j)
 		grid.FlipSpin(i, j)
-		//grid.Plot()
 		eAft := grid.SpinEnergy(i, j)
-		//fmt.Println("eBef, eAft = ", eBef, eAft)
 		deltaE := eAft - eBef
-		//fmt.Println("deltaE=", deltaE)
 		if deltaE > 0 {
 			prob := math.Exp(-deltaE / (kB * T))
 			rnd := rand.Float64()
-			//fmt.Println("prob, rnd=", prob, rnd)
 			if prob < rnd { // undo spin flip (don't accept change)
 				grid.FlipSpin(i, j)
-				//eAftUndo := grid.SpinEnergy(i, j)
-				//fmt.Println("eAftUndo = ", eAftUndo)
 			}
 		}
-		if k%30000 == 0 {
-			//grid.Plot()
+		if k%40000 == 0 {
 			Plot(*grid)
 		}
 	}
-
-	time.Sleep(3000 * time.Millisecond)
 }
-
-var (
-	addrFlag = flag.String("addr", ":5555", "server address:port")
-	datac    = make(chan plots)
-)
-
-type plots struct {
-	H2D string `json:"h2d"`
-}
-
-func webServer() {
-	http.HandleFunc("/", plotHandle)
-	http.Handle("/data", websocket.Handler(dataHandler))
-	err := http.ListenAndServe(*addrFlag, nil)
-	if err != nil {
-		panic(err)
-	}
-}
-
-/*
-func plotH2D(h2d *hbook.H2D) {
-	p, err := plot.New()
-	if err != nil {
-		panic(err)
-	}
-	p.X.Label.Text = "X"
-	p.Y.Label.Text = "Y"
-	p.X.Tick.Marker = &hplot.FreqTicks{N: 11, Freq: 2}
-	p.Y.Tick.Marker = &hplot.FreqTicks{N: 11, Freq: 2}
-	p.X.Min = h2d.XMin()
-	p.Y.Min = h2d.YMin()
-	p.X.Max = h2d.XMax()
-	p.Y.Max = h2d.YMax()
-	p.Add(hplot.NewH2D(h2d, nil))
-
-	s := renderSVG(p)
-	datac <- plots{s}
-}
-*/
-
-func renderSVG(p *plot.Plot) string {
-	size := 20 * vg.Centimeter
-	canvas := vgsvg.New(size, size)
-	p.Draw(draw.New(canvas))
-	out := new(bytes.Buffer)
-	_, err := canvas.WriteTo(out)
-	if err != nil {
-		panic(err)
-	}
-	return string(out.Bytes())
-}
-
-func plotHandle(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, page)
-}
-
-func dataHandler(ws *websocket.Conn) {
-	for data := range datac {
-		err := websocket.JSON.Send(ws, data)
-		if err != nil {
-			log.Printf("error sending data: %v\n", err)
-			return
-		}
-	}
-}
-
-const page = `
-<html>
-	<head>
-		<title>Plotting stuff with gonum/plot</title>
-		<script type="text/javascript">
-		var sock = null;
-		var h2dplot = "";
-
-		function update() {
-			var p3 = document.getElementById("my-h2d-plot");
-			p3.innerHTML = h2dplot;
-		};
-
-		window.onload = function() {
-			sock = new WebSocket("ws://"+location.host+"/data");
-
-			sock.onmessage = function(event) {
-				var data = JSON.parse(event.data);
-				//console.log("data: "+JSON.stringify(data));
-				h2dplot = data.h2d;
-				update();
-			};
-		};
-
-		</script>
-
-		<style>
-		.my-plot-style {
-			width: 400px;
-			height: 200px;
-			font-size: 14px;
-			line-height: 1.2em;
-		}
-		</style>
-	</head>
-
-	<body>
-		<div id="header">
-			<h2>My plot</h2>
-		</div>
-
-		<div id="content">
-			<div id="my-h2d-plot" class="my-plot-style"></div>
-		</div>
-	</body>
-</html>
-`
