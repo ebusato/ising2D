@@ -1,3 +1,5 @@
+// This file contains helper functions to perform web-based plotting
+
 package main
 
 import (
