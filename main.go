@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"time"
 
+	"go-hep.org/x/hep/hplot"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
@@ -120,7 +121,7 @@ func (g *Grid) Energy() float64 {
 			ene += g.SpinEnergy(i, j)
 		}
 	}
-	return ene / float64(g.N*g.N) / 2.
+	return ene / 2.
 }
 
 func (g *Grid) Mag() float64 {
@@ -130,7 +131,7 @@ func (g *Grid) Mag() float64 {
 			mag += g.M[i][j].Val
 		}
 	}
-	return mag / float64(g.N*g.N)
+	return mag
 }
 
 func (g *Grid) Move() {
@@ -201,8 +202,8 @@ func Plot(grid *Grid, T []float64, E []float64, Mag []float64) {
 
 		scaUp.GlyphStyle.Color = color.RGBA{255, 0, 0, 255}
 		scaDown.GlyphStyle.Color = color.RGBA{0, 0, 255, 255}
-		scaUp.GlyphStyle.Radius = vg.Points(3.5)
-		scaDown.GlyphStyle.Radius = vg.Points(3.5)
+		scaUp.GlyphStyle.Radius = vg.Points(4.5)
+		scaDown.GlyphStyle.Radius = vg.Points(4.5)
 		scaUp.GlyphStyle.Shape = draw.BoxGlyph{}
 		scaDown.GlyphStyle.Shape = draw.BoxGlyph{}
 
@@ -222,10 +223,12 @@ func Plot(grid *Grid, T []float64, E []float64, Mag []float64) {
 			panic(err)
 		}
 
-		p.Title.Text = "Energy vs temperature"
-		p.X.Label.Text = "X"
-		p.Y.Label.Text = "Y"
-		err = plotutil.AddLinePoints(p, pts)
+		p.Title.Text = ""
+		p.X.Label.Text = "Temperature"
+		p.Y.Label.Text = "Energy"
+		p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
+		p.Add(hplot.NewGrid())
+		err = plotutil.AddScatters(p, pts)
 		if err != nil {
 			panic(err)
 		}
@@ -245,10 +248,12 @@ func Plot(grid *Grid, T []float64, E []float64, Mag []float64) {
 			panic(err)
 		}
 
-		p.Title.Text = "Magnetization vs temperature"
-		p.X.Label.Text = "X"
-		p.Y.Label.Text = "Y"
-		err = plotutil.AddLinePoints(p, pts)
+		p.Title.Text = ""
+		p.X.Label.Text = "Temperature"
+		p.Y.Label.Text = "Magnetization"
+		p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
+		p.Add(hplot.NewGrid())
+		err = plotutil.AddScatters(p, pts)
 		if err != nil {
 			panic(err)
 		}
@@ -266,13 +271,13 @@ func main() {
 
 	go webServer(addrFlag)
 
-	N := 16
+	N := 20
 
-	nT := 50
+	nT := math.Pow(2, 5)
 	nThermal := math.Pow(2, 10) * float64(N*N)
 	nMC := math.Pow(2, 10)
 
-	temps := make([]float64, nT)
+	temps := make([]float64, int(nT))
 	for i := range temps {
 		temps[i] = 1 + float64(i)*(4-1)/float64(len(temps))
 	}
