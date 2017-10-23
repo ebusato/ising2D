@@ -209,8 +209,10 @@ func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []fl
 
 		p, _ := plot.New()
 		p.Add(scaUp, scaDown)
+		p.Save(6*vg.Inch, 6*vg.Inch, "Grid2D.png")
 
 		sGrid = renderSVG(p)
+		datac <- Plots{Plot: sGrid}
 	}
 	if T != nil && E != nil {
 		pts := make(plotter.XYs, len(T))
@@ -287,7 +289,6 @@ func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []fl
 			panic(err)
 		}
 	}
-	datac <- Plots{Plot: sGrid}
 }
 
 func main() {
@@ -297,6 +298,13 @@ func main() {
 	go webServer(addrFlag)
 
 	N := 20
+
+	///////////////////////////////////////////////////////////////
+	// Simple example of grid construction and initialization
+	//grid := NewGrid(N, 1, 1)
+	//grid.Init()
+	//Plot(grid, nil, nil, nil, nil)
+	///////////////////////////////////////////////////////////////
 
 	nT := math.Pow(2, 8)
 	nThermal := math.Pow(2, 10) * float64(N*N)
@@ -337,4 +345,5 @@ func main() {
 		mags[iT] = 1 / (nMC * float64(N*N)) * math.Abs(mag)
 	}
 	Plot(nil, temps, energies, specificheat, mags)
+
 }
