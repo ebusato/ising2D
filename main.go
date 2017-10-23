@@ -102,7 +102,8 @@ func (g *Grid) FindNearestNeighbours(i, j int) NearestNeighbours {
 	return NNs
 }
 
-func (g *Grid) SpinEnergy(i, j int) float64 {
+// With periodic conditions
+func (g *Grid) SpinEnergy(i, j int, h float64) float64 {
 	NNs := g.FindNearestNeighbours(i, j)
 	NNsArr := NNs.Array()
 	var energy float64
@@ -111,14 +112,34 @@ func (g *Grid) SpinEnergy(i, j int) float64 {
 		jNN := nn[1]
 		energy += -1 * g.J * g.M[i][j].Val * g.M[iNN][jNN].Val
 	}
+	energy += -1 * h * g.M[i][j].Val
 	return energy
 }
 
-func (g *Grid) Energy() float64 {
+// Without periodic conditions
+// func (g *Grid) SpinEnergy(i, j int) float64 {
+// 	var energy float64
+//
+// 	if i > 0 { // top
+// 		energy += -1 * g.J * g.M[i][j].Val * g.M[i-1][j].Val
+// 	}
+// 	if i < g.N-1 { // bottom
+// 		energy += -1 * g.J * g.M[i][j].Val * g.M[i+1][j].Val
+// 	}
+// 	if j > 0 { // left
+// 		energy += -1 * g.J * g.M[i][j].Val * g.M[i][j-1].Val
+// 	}
+// 	if j < g.N-1 { // right
+// 		energy += -1 * g.J * g.M[i][j].Val * g.M[i][j+1].Val
+// 	}
+// 	return energy
+// }
+
+func (g *Grid) Energy(h float64) float64 {
 	var ene float64
 	for i := range g.M {
 		for j := range g.M[i] {
-			ene += g.SpinEnergy(i, j)
+			ene += g.SpinEnergy(i, j, h)
 		}
 	}
 	return ene / 2.
@@ -134,11 +155,11 @@ func (g *Grid) Mag() float64 {
 	return mag
 }
 
-func (g *Grid) Move() {
+func (g *Grid) Move(h float64) {
 	i, j := g.PickRandomSpin()
-	eBef := g.SpinEnergy(i, j)
+	eBef := g.SpinEnergy(i, j, h)
 	g.FlipSpin(i, j)
-	eAft := g.SpinEnergy(i, j)
+	eAft := g.SpinEnergy(i, j, h)
 	deltaE := eAft - eBef
 	if deltaE > 0 {
 		prob := math.Exp(-deltaE / (kB * g.T))
@@ -149,13 +170,13 @@ func (g *Grid) Move() {
 	}
 }
 
-func (g *Grid) Evolve(nSteps int, plot bool) {
+func (g *Grid) Evolve(nSteps int, h float64, plot bool) {
 	for k := 0; k < nSteps; k++ {
 		//time.Sleep(1 * time.Millisecond)
 		// 		if k%500000 == 0 {
 		// 			fmt.Println("k=", k)
 		// 		}
-		g.Move()
+		g.Move(h)
 		if plot && k%40000 == 0 {
 			Plot(g, nil, nil, nil, nil)
 		}
@@ -175,8 +196,8 @@ func NewPoints(grid *Grid, spinVal float64) *Points {
 			s := grid.M[i][j]
 			if s.Val == spinVal {
 				points.N += 1
-				points.X = append(points.X, float64(i))
-				points.Y = append(points.Y, float64(j))
+				points.X = append(points.X, float64(j)) // column
+				points.Y = append(points.Y, float64(i)) // row
 			}
 		}
 	}
@@ -192,7 +213,7 @@ func (p *Points) XY(i int) (x, y float64) {
 }
 
 func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []float64) {
-	sGrid := ""
+	// 	sGrid := ""
 	if grid != nil {
 		pointsUp := NewPoints(grid, +1)
 		pointsDown := NewPoints(grid, -1)
@@ -202,8 +223,8 @@ func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []fl
 
 		scaUp.GlyphStyle.Color = color.RGBA{255, 0, 0, 255}
 		scaDown.GlyphStyle.Color = color.RGBA{0, 0, 255, 255}
-		scaUp.GlyphStyle.Radius = vg.Points(4.5)
-		scaDown.GlyphStyle.Radius = vg.Points(4.5)
+		scaUp.GlyphStyle.Radius = vg.Points(3.5)
+		scaDown.GlyphStyle.Radius = vg.Points(3.5)
 		scaUp.GlyphStyle.Shape = draw.BoxGlyph{}
 		scaDown.GlyphStyle.Shape = draw.BoxGlyph{}
 
@@ -211,8 +232,8 @@ func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []fl
 		p.Add(scaUp, scaDown)
 		p.Save(6*vg.Inch, 6*vg.Inch, "Grid2D.png")
 
-		sGrid = renderSVG(p)
-		datac <- Plots{Plot: sGrid}
+		// 		sGrid = renderSVG(p)
+		datac <- Plots{Plot: renderSVG(p)}
 	}
 	if T != nil && E != nil {
 		pts := make(plotter.XYs, len(T))
@@ -297,15 +318,18 @@ func main() {
 
 	go webServer(addrFlag)
 
-	N := 20
+	N := 80
 
 	///////////////////////////////////////////////////////////////
 	// Simple example of grid construction and initialization
-	//grid := NewGrid(N, 1, 1)
-	//grid.Init()
-	//Plot(grid, nil, nil, nil, nil)
+	/*grid := NewGrid(N, 1, 1)
+	grid.Init()
+	Plot(grid, nil, nil, nil, nil)*/
 	///////////////////////////////////////////////////////////////
 
+	///////////////////////////////////////////////////////////////
+	// Study energy, magnetization and specific heat as a function
+	// of the energy
 	nT := math.Pow(2, 8)
 	nThermal := math.Pow(2, 10) * float64(N*N)
 	nMC := math.Pow(2, 10)
@@ -322,16 +346,16 @@ func main() {
 		fmt.Println("Temperature =", temp)
 		grid := NewGrid(N, 1, temp)
 		grid.Init()
-		grid.Evolve(int(nThermal), true)
+		grid.Evolve(int(nThermal), 0, true)
 		var ene float64
 		var mag float64
 		var ene2 float64
 		var mag2 float64
 		for k := 0; k < int(nMC); k++ {
 			for kk := 0; kk < N*N; kk++ {
-				grid.Move()
+				grid.Move(0)
 			}
-			eneloc := grid.Energy()
+			eneloc := grid.Energy(0)
 			magloc := grid.Mag()
 			ene += eneloc
 			mag += magloc
@@ -345,5 +369,5 @@ func main() {
 		mags[iT] = 1 / (nMC * float64(N*N)) * math.Abs(mag)
 	}
 	Plot(nil, temps, energies, specificheat, mags)
-
+	///////////////////////////////////////////////////////////////
 }
