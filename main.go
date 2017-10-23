@@ -157,7 +157,7 @@ func (g *Grid) Evolve(nSteps int, plot bool) {
 		// 		}
 		g.Move()
 		if plot && k%40000 == 0 {
-			Plot(g, nil, nil, nil)
+			Plot(g, nil, nil, nil, nil)
 		}
 	}
 }
@@ -191,7 +191,7 @@ func (p *Points) XY(i int) (x, y float64) {
 	return p.X[i], p.Y[i]
 }
 
-func Plot(grid *Grid, T []float64, E []float64, Mag []float64) {
+func Plot(grid *Grid, T []float64, E []float64, specificheat []float64, Mag []float64) {
 	sGrid := ""
 	if grid != nil {
 		pointsUp := NewPoints(grid, +1)
@@ -237,6 +237,31 @@ func Plot(grid *Grid, T []float64, E []float64, Mag []float64) {
 			panic(err)
 		}
 	}
+	if T != nil && specificheat != nil {
+		pts := make(plotter.XYs, len(T))
+		for i := range T {
+			pts[i].X = T[i]
+			pts[i].Y = specificheat[i]
+		}
+		p, err := plot.New()
+		if err != nil {
+			panic(err)
+		}
+
+		p.Title.Text = ""
+		p.X.Label.Text = "Temperature"
+		p.Y.Label.Text = "Cv"
+		p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
+		p.Add(hplot.NewGrid())
+		err = plotutil.AddScatters(p, pts)
+		if err != nil {
+			panic(err)
+		}
+		// Save the plot to a PNG file.
+		if err := p.Save(6*vg.Inch, 3*vg.Inch, "CvVstemp.png"); err != nil {
+			panic(err)
+		}
+	}
 	if T != nil && Mag != nil {
 		pts := make(plotter.XYs, len(T))
 		for i := range T {
@@ -273,7 +298,7 @@ func main() {
 
 	N := 20
 
-	nT := math.Pow(2, 5)
+	nT := math.Pow(2, 8)
 	nThermal := math.Pow(2, 10) * float64(N*N)
 	nMC := math.Pow(2, 10)
 
@@ -281,12 +306,9 @@ func main() {
 	for i := range temps {
 		temps[i] = 1 + float64(i)*(4-1)/float64(len(temps))
 	}
-	//temps := []float64{0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2., 2.2, 2.4, 2.6, 2.8, 3, 3.2, 3.4}
-	//temps := []float64{2, 2.269, 3}
-	var energies []float64
-	var mags []float64
-	energies = make([]float64, len(temps))
-	mags = make([]float64, len(temps))
+	energies := make([]float64, len(temps))
+	specificheat := make([]float64, len(temps))
+	mags := make([]float64, len(temps))
 
 	for iT, temp := range temps {
 		fmt.Println("Temperature =", temp)
@@ -311,7 +333,8 @@ func main() {
 
 		}
 		energies[iT] = 1 / (nMC * float64(N*N)) * ene
+		specificheat[iT] = (1/(nMC*float64(N*N))*ene2 - 1/(nMC*nMC*float64(N*N))*ene*ene) * 1 / temp
 		mags[iT] = 1 / (nMC * float64(N*N)) * math.Abs(mag)
 	}
-	Plot(nil, temps, energies, mags)
+	Plot(nil, temps, energies, specificheat, mags)
 }
