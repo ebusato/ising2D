@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"image/color"
 	"math"
 	"math/rand"
@@ -322,52 +321,55 @@ func main() {
 
 	///////////////////////////////////////////////////////////////
 	// Simple example of grid construction and initialization
-	/*grid := NewGrid(N, 1, 1)
+	grid := NewGrid(N, 1, 1)
 	grid.Init()
-	Plot(grid, nil, nil, nil, nil)*/
+	grid.Evolve(int(math.Pow(2, 10)*float64(N*N)), 0, true)
+	Plot(grid, nil, nil, nil, nil)
 	///////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////
 	// Study energy, magnetization and specific heat as a function
 	// of the energy
-	nT := math.Pow(2, 8)
-	nThermal := math.Pow(2, 10) * float64(N*N)
-	nMC := math.Pow(2, 10)
+	/*
+		nT := math.Pow(2, 8)
+		nThermal := math.Pow(2, 10) * float64(N*N)
+		nMC := math.Pow(2, 10)
 
-	temps := make([]float64, int(nT))
-	for i := range temps {
-		temps[i] = 1 + float64(i)*(4-1)/float64(len(temps))
-	}
-	energies := make([]float64, len(temps))
-	specificheat := make([]float64, len(temps))
-	mags := make([]float64, len(temps))
-
-	for iT, temp := range temps {
-		fmt.Println("Temperature =", temp)
-		grid := NewGrid(N, 1, temp)
-		grid.Init()
-		grid.Evolve(int(nThermal), 0, true)
-		var ene float64
-		var mag float64
-		var ene2 float64
-		var mag2 float64
-		for k := 0; k < int(nMC); k++ {
-			for kk := 0; kk < N*N; kk++ {
-				grid.Move(0)
-			}
-			eneloc := grid.Energy(0)
-			magloc := grid.Mag()
-			ene += eneloc
-			mag += magloc
-			ene2 += eneloc * eneloc
-			mag2 += magloc * magloc
-			// 			fmt.Println("ene, mag=", ene, mag)
-
+		temps := make([]float64, int(nT))
+		for i := range temps {
+			temps[i] = 1 + float64(i)*(4-1)/float64(len(temps))
 		}
-		energies[iT] = 1 / (nMC * float64(N*N)) * ene
-		specificheat[iT] = (1/(nMC*float64(N*N))*ene2 - 1/(nMC*nMC*float64(N*N))*ene*ene) * 1 / temp
-		mags[iT] = 1 / (nMC * float64(N*N)) * math.Abs(mag)
-	}
-	Plot(nil, temps, energies, specificheat, mags)
+		energies := make([]float64, len(temps))
+		specificheat := make([]float64, len(temps))
+		mags := make([]float64, len(temps))
+
+		for iT, temp := range temps {
+			fmt.Println("Temperature =", temp)
+			grid := NewGrid(N, 1, temp)
+			grid.Init()
+			grid.Evolve(int(nThermal), 0, true)
+			var ene float64
+			var mag float64
+			var ene2 float64
+			var mag2 float64
+			for k := 0; k < int(nMC); k++ {
+				for kk := 0; kk < N*N; kk++ {
+					grid.Move(0)
+				}
+				eneloc := grid.Energy(0)
+				magloc := grid.Mag()
+				ene += eneloc
+				mag += magloc
+				ene2 += eneloc * eneloc
+				mag2 += magloc * magloc
+				// 			fmt.Println("ene, mag=", ene, mag)
+
+			}
+			energies[iT] = 1 / (nMC * float64(N*N)) * ene
+			specificheat[iT] = (1/(nMC*float64(N*N))*ene2 - 1/(nMC*nMC*float64(N*N))*ene*ene) * 1 / temp
+			mags[iT] = 1 / (nMC * float64(N*N)) * math.Abs(mag)
+		}
+		Plot(nil, temps, energies, specificheat, mags)
+	*/
 	///////////////////////////////////////////////////////////////
 }
